@@ -1,0 +1,1 @@
+DefaultEndpointsProtocol=https;AccountName=nce8sa;AccountKey=lJmz6rqdmNcINn1VyQog5qlblHPq6wRP4B3Lqd7z+DBBZEokZf80SlMU4hefsGkCV911mAgQq5Cypw65NJKMNA==;EndpointSuffix=core.windows.net

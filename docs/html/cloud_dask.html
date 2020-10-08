@@ -271,6 +271,50 @@ div.rendered_html tbody tr:hover {
 </style>
 <div class="section" id="Setting-up-a-Dask-Cluster-on-AzureML">
 <h1>Setting up a Dask Cluster on AzureML<a class="headerlink" href="#Setting-up-a-Dask-Cluster-on-AzureML" title="Permalink to this headline">¶</a></h1>
+<p>In this lesson, we’ll be using a dask cluster to replicate the <a class="reference internal" href="exercises/Exercise_bigdata.html"><span class="doc">exercise we did in the Big Data section</span></a> where we loaded global temperature data to measure global warming at a number of locations.</p>
+<p>To run this code, in addition the <code class="docutils literal notranslate"><span class="pre">dask</span></code> and <code class="docutils literal notranslate"><span class="pre">pandas</span></code>, which you should already have installed, you’ll need to install the following packages (<code class="docutils literal notranslate"><span class="pre">azureml-sdk</span></code> and <code class="docutils literal notranslate"><span class="pre">dask_cloudprovider</span></code>) with the following commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">azure</span><span class="o">-</span><span class="n">storage</span><span class="o">-</span><span class="n">blob</span> <span class="c1"># For managing storage</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">azureml</span><span class="o">-</span><span class="n">sdk</span>                         <span class="c1"># For managing compute</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">dask_cloudprovider</span><span class="o">=</span><span class="mf">0.4</span><span class="o">.</span><span class="mi">1</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">dask_cloudprovider</span></code> sometimes doesn’t load the right version if you don’t specify, and as of October 2020 the right version isn’t even on <code class="docutils literal notranslate"><span class="pre">conda-forge</span></code>, so don’t use <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">install</span></code>. You can also pip install <code class="docutils literal notranslate"><span class="pre">azure-storage-blob</span></code> if you prefer <code class="docutils literal notranslate"><span class="pre">pip</span></code> to <code class="docutils literal notranslate"><span class="pre">conda</span></code>.</p>
+<div class="section" id="Upload-our-Data">
+<h2>Upload our Data<a class="headerlink" href="#Upload-our-Data" title="Permalink to this headline">¶</a></h2>
+<p>We’ll start by uploading our Climate Data to Azure storage. The one thing you don’t see in this code is that I’ve already created a Storage Account with Azure, and I put the “connection string” for that account into the file that I’m reading (you can put it directly into your code, but if I did that y’all could see my connect string and mess with my account!).</p>
+<p>You can get the connection string by going to your Azure Portal, selecting Storage Accounts, selecting the relevant account, and clicking “Access Keys” on the left.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
+<span></span><span class="o">%</span><span class="k">load_ext</span> lab_black
+<span class="kn">from</span> <span class="nn">azure.storage.blob</span> <span class="kn">import</span> <span class="n">BlobServiceClient</span><span class="p">,</span> <span class="n">BlobClient</span><span class="p">,</span> <span class="n">ContainerClient</span><span class="p">,</span> <span class="n">__version__</span>
+
+<span class="c1"># Load connection string</span>
+<span class="n">con</span>
+
+<span class="c1"># Create the BlobServiceClient object which will be used to create a container client</span>
+<span class="n">blob_service_client</span> <span class="o">=</span> <span class="n">BlobServiceClient</span><span class="o">.</span><span class="n">from_connection_string</span><span class="p">(</span><span class="n">connect_str</span><span class="p">)</span>
+
+<span class="c1"># Create a unique name for the container</span>
+<span class="n">container_name</span> <span class="o">=</span> <span class="s2">&quot;quickstart&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())</span>
+
+<span class="c1"># Create the container</span>
+<span class="n">container_client</span> <span class="o">=</span> <span class="n">blob_service_client</span><span class="o">.</span><span class="n">create_container</span><span class="p">(</span><span class="n">container_name</span><span class="p">)</span>
+<span class="c1"># Create a blob client using the local file name as the name for the blob</span>
+<span class="n">blob_client</span> <span class="o">=</span> <span class="n">blob_service_client</span><span class="o">.</span><span class="n">get_blob_client</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">container_name</span><span class="p">,</span> <span class="n">blob</span><span class="o">=</span><span class="n">local_file_name</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Uploading to Azure Storage as blob:</span><span class="se">\n\t</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">local_file_name</span><span class="p">)</span>
+
+<span class="c1"># Upload the created file</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">upload_file_path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+    <span class="n">blob_client</span><span class="o">.</span><span class="n">upload_blob</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+</pre></div>
+</div>
+</div>
+</div>
 <div class="section" id="Starting-a-Dask-Cluster">
 <h2>Starting a Dask Cluster<a class="headerlink" href="#Starting-a-Dask-Cluster" title="Permalink to this headline">¶</a></h2>
 <div class="nbinput nblast docutils container">
@@ -461,12 +505,14 @@ WARNING - Retrying (Retry(total=2, connect=2, read=3, redirect=None, status=None
 <li class="toctree-l1"><a class="reference internal" href="command_line_part2.html">Command Line, Advanced</a></li>
 <li class="toctree-l1"><a class="reference internal" href="jupyter.html">Jupyter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="git_and_github.html">Git and Github</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parquet.html">Parquet Format</a></li>
 </ul>
 <p class="caption"><span class="caption-text">CLOUD</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="cloud_what_is_it.html">What Is The Cloud?</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cloud_azureml.html">AzureML</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Set Up Dask on AzureML</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Upload-our-Data">Upload our Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Starting-a-Dask-Cluster">Starting a Dask Cluster</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Accessing-Your-Data">Accessing Your Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Using-Your-Cluster">Using Your Cluster</a></li>
